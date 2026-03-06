@@ -1,0 +1,24 @@
+#+title: Personal Calendar
+
+* Events
+** Meeting with John
+<2026-03-06 Fri 10:00-11:00>
+:PROPERTIES:
+:ID:       test-event-meeting-id
+:LOCATION: Coffee Shop
+:END:
+Discuss project updates.
+
+** Dentist appointment
+<2026-03-10 Tue 14:00-15:00>
+:PROPERTIES:
+:ID:       test-event-dentist-id
+:LOCATION: Downtown Clinic
+:END:
+
+** Weekly review
+<2026-03-07 Sat 09:00-10:00 +1w>
+:PROPERTIES:
+:ID:       test-event-review-id
+:END:
+Weekly GTD review session.

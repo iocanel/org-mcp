@@ -1,0 +1,30 @@
+#+title: Habits
+
+* Habits
+** TODO Log weight
+SCHEDULED: <2026-03-06 Fri .+1d>
+:PROPERTIES:
+:ID:       test-habit-weight-id
+:STYLE:    habit
+:END:
+:LOGBOOK:
+- State "DONE"       from "TODO"       [2026-03-05 Thu 08:00]
+- State "DONE"       from "TODO"       [2026-03-04 Wed 08:15]
+:END:
+
+** TODO Check emails
+SCHEDULED: <2026-03-06 Fri .+1d>
+:PROPERTIES:
+:ID:       test-habit-email-id
+:STYLE:    habit
+:END:
+:LOGBOOK:
+- State "DONE"       from "TODO"       [2026-03-05 Thu 09:00]
+:END:
+
+** TODO Exercise
+SCHEDULED: <2026-03-06 Fri .+1d/3d>
+:PROPERTIES:
+:ID:       test-habit-exercise-id
+:STYLE:    habit
+:END:

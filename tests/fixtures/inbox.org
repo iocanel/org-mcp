@@ -1,0 +1,49 @@
+:PROPERTIES:
+:ID:       test-inbox-id
+:END:
+#+title: Inbox
+
+Capture the information here and then refile to the right place.
+
+* Personal :personal:
+** TODO Test personal task
+SCHEDULED: <2026-03-06 Fri>
+:PROPERTIES:
+:ID:       test-personal-task-id
+:END:
+This is a test personal task.
+
+** DONE Completed personal task
+CLOSED: [2026-03-05 Thu 10:00]
+:PROPERTIES:
+:ID:       test-completed-personal-id
+:END:
+
+* Work :work:
+** TODO Test work task
+SCHEDULED: <2026-03-06 Fri>
+DEADLINE: <2026-03-10 Tue>
+:PROPERTIES:
+:ID:       test-work-task-id
+:END:
+Work task with deadline.
+
+** TODO Another work task
+SCHEDULED: <2026-03-07 Sat>
+:PROPERTIES:
+:ID:       test-work-task-2-id
+:END:
+
+* Email :email:
+** Follow Up
+*** TODO Follow up on project proposal
+DEADLINE: <2026-03-08 Sun>
+:PROPERTIES:
+:ID:       test-email-followup-id
+:END:
+
+** Read Later
+*** TODO Read architecture article
+:PROPERTIES:
+:ID:       test-email-read-id
+:END:
