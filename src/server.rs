@@ -54,6 +54,28 @@ pub struct HabitMarkParams {
 }
 
 #[derive(Debug, Clone, serde::Deserialize, schemars::JsonSchema)]
+pub struct CreateHabitParams {
+    #[schemars(description = "Title of the new habit")]
+    pub title: String,
+    #[schemars(description = "Repeater controlling recurrence, e.g. .+1d, .+1w, .+1m")]
+    pub repeater: String,
+    #[schemars(description = "First scheduled date (YYYY-MM-DD). Defaults to today.")]
+    pub scheduled: Option<String>,
+    #[schemars(
+        description = "File to create the habit in. Defaults to the first agenda file (usually habits.org)."
+    )]
+    pub file_path: Option<String>,
+    #[schemars(description = "Optional tags")]
+    pub tags: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone, serde::Deserialize, schemars::JsonSchema)]
+pub struct DeleteHabitParams {
+    #[schemars(description = "ID or title of the habit to delete")]
+    pub habit: String,
+}
+
+#[derive(Debug, Clone, serde::Deserialize, schemars::JsonSchema)]
 pub struct CreateTaskParams {
     #[schemars(description = "Title of the new task")]
     pub title: String,
@@ -337,6 +359,68 @@ impl OrgMcpServer {
 
         Ok(CallToolResult::success(vec![Content::text(format!(
             "Marked '{}' as done",
+            habit.title
+        ))]))
+    }
+
+    #[tool(description = "Create a new recurring habit (a TODO with a repeating SCHEDULED timestamp and :STYLE: habit)")]
+    async fn create_habit(
+        &self,
+        Parameters(params): Parameters<CreateHabitParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let scheduled = params
+            .scheduled
+            .unwrap_or_else(|| chrono::Local::now().date_naive().format("%Y-%m-%d").to_string());
+        let file_path = params.file_path.unwrap_or_else(|| {
+            self.config
+                .agenda_files()
+                .first()
+                .map(|p| p.display().to_string())
+                .unwrap_or_else(|| "~/Documents/org/habits.org".to_string())
+        });
+        let tags = params.tags.unwrap_or_default();
+
+        habits::create_habit(
+            &*self.emacs,
+            &file_path,
+            &params.title,
+            &scheduled,
+            &params.repeater,
+            &tags,
+        )
+        .await
+        .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+
+        Ok(CallToolResult::success(vec![Content::text(format!(
+            "Created habit '{}' in {}",
+            params.title, file_path
+        ))]))
+    }
+
+    #[tool(description = "Delete a habit by ID or title")]
+    async fn delete_habit(
+        &self,
+        Parameters(params): Parameters<DeleteHabitParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let habits_list = habits::get_habits(&self.config)
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+
+        let habit = habits_list
+            .iter()
+            .find(|h| {
+                h.id.as_ref().map_or(false, |id| id == &params.habit)
+                    || h.title.eq_ignore_ascii_case(&params.habit)
+            })
+            .ok_or_else(|| {
+                McpError::invalid_params(format!("Habit not found: {}", params.habit), None)
+            })?;
+
+        habits::delete_habit(&*self.emacs, habit)
+            .await
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+
+        Ok(CallToolResult::success(vec![Content::text(format!(
+            "Deleted '{}'",
             habit.title
         ))]))
     }

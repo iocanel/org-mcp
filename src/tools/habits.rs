@@ -36,6 +36,63 @@ pub fn get_habits_due_today(config: &Config) -> Result<Vec<Habit>> {
     get_habits_due(config, today)
 }
 
+pub async fn create_habit<E: EmacsClientTrait>(
+    emacs: &E,
+    file_path: &str,
+    title: &str,
+    scheduled: &str,
+    repeater: &str,
+    tags: &[String],
+) -> Result<()> {
+    let mut headline = format!("* TODO {}", title);
+    if !tags.is_empty() {
+        headline.push_str(&format!(" :{}:", tags.join(":")));
+    }
+
+    // Org timestamps include the weekday name (e.g. <2026-07-24 Fri .+1w>); the
+    // parser requires it, so derive it from the scheduled date.
+    let scheduled_ts = match NaiveDate::parse_from_str(scheduled, "%Y-%m-%d") {
+        Ok(d) => format!("{} {} {}", scheduled, d.format("%a"), repeater),
+        Err(_) => format!("{} {}", scheduled, repeater),
+    };
+
+    // A habit is a TODO with a repeating SCHEDULED timestamp and :STYLE: habit.
+    let content = format!(
+        "{headline}\nSCHEDULED: <{scheduled_ts}>\n:PROPERTIES:\n:STYLE:    habit\n:END:"
+    );
+
+    let elisp = format!(
+        r#"(with-current-buffer (find-file-noselect "{}")
+  (goto-char (point-max))
+  (insert "\n{}\n")
+  (save-buffer))"#,
+        file_path,
+        content.replace('\\', "\\\\").replace('"', "\\\"")
+    );
+
+    emacs.eval(&elisp).await?;
+    Ok(())
+}
+
+pub async fn delete_habit<E: EmacsClientTrait>(emacs: &E, habit: &Habit) -> Result<()> {
+    let file_path = &habit.file_path;
+
+    // Delete the whole subtree of the matching habit headline.
+    let elisp = format!(
+        r#"(with-current-buffer (find-file-noselect "{}")
+  (goto-char (point-min))
+  (when (re-search-forward "^\\*+ TODO {}" nil t)
+    (org-back-to-heading t)
+    (org-cut-subtree))
+  (save-buffer))"#,
+        file_path,
+        habit.title.replace('\\', "\\\\").replace('"', "\\\"")
+    );
+
+    emacs.eval(&elisp).await?;
+    Ok(())
+}
+
 pub async fn mark_habit_done<E: EmacsClientTrait>(emacs: &E, habit: &Habit) -> Result<()> {
     let file_path = &habit.file_path;
 
@@ -205,6 +262,61 @@ SCHEDULED: <2026-03-05 Thu .+1d/3d>
 
         let habits = get_habits(&config).unwrap();
         assert!(habits.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_create_habit() {
+        let mut mock_emacs = MockEmacsClientTrait::new();
+        mock_emacs
+            .expect_eval()
+            .withf(|elisp: &str| {
+                elisp.contains("find-file-noselect")
+                    && elisp.contains("/path/to/habits.org")
+                    && elisp.contains("TODO Weekly OSS contribution")
+                    && elisp.contains(":oss:")
+                    // day name derived from 2026-07-24 (a Friday) and repeater present
+                    && elisp.contains("<2026-07-24 Fri .+1w>")
+                    && elisp.contains(":STYLE:    habit")
+            })
+            .times(1)
+            .returning(|_| Box::pin(async { Ok("nil".to_string()) }));
+
+        let result = create_habit(
+            &mock_emacs,
+            "/path/to/habits.org",
+            "Weekly OSS contribution",
+            "2026-07-24",
+            ".+1w",
+            &["oss".to_string()],
+        )
+        .await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_delete_habit() {
+        let habit = Habit {
+            id: Some("habit-blog".to_string()),
+            title: "Monthly blog post".to_string(),
+            scheduled: Some(chrono::NaiveDate::from_ymd_opt(2026, 7, 24).unwrap()),
+            repeater: Some(".+1m".to_string()),
+            file_path: "/path/to/habits.org".to_string(),
+            line_number: 10,
+        };
+
+        let mut mock_emacs = MockEmacsClientTrait::new();
+        mock_emacs
+            .expect_eval()
+            .withf(|elisp: &str| {
+                elisp.contains("find-file-noselect")
+                    && elisp.contains("Monthly blog post")
+                    && elisp.contains("org-cut-subtree")
+            })
+            .times(1)
+            .returning(|_| Box::pin(async { Ok("nil".to_string()) }));
+
+        let result = delete_habit(&mock_emacs, &habit).await;
+        assert!(result.is_ok());
     }
 
     #[tokio::test]
