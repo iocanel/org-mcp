@@ -348,7 +348,7 @@ impl OrgMcpServer {
         let habit = habits_list
             .iter()
             .find(|h| {
-                h.id.as_ref().map_or(false, |id| id == &params.habit)
+                h.id.as_deref() == Some(params.habit.as_str())
                     || h.title.eq_ignore_ascii_case(&params.habit)
             })
             .ok_or_else(|| McpError::invalid_params(format!("Habit not found: {}", params.habit), None))?;
@@ -408,7 +408,7 @@ impl OrgMcpServer {
         let habit = habits_list
             .iter()
             .find(|h| {
-                h.id.as_ref().map_or(false, |id| id == &params.habit)
+                h.id.as_deref() == Some(params.habit.as_str())
                     || h.title.eq_ignore_ascii_case(&params.habit)
             })
             .ok_or_else(|| {

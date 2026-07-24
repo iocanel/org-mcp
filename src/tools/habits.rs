@@ -5,6 +5,11 @@ use crate::parser::OrgFile;
 use anyhow::Result;
 use chrono::{Local, NaiveDate};
 
+/// Escape a value for interpolation inside an elisp double-quoted string.
+fn elisp_str(s: &str) -> String {
+    s.replace('\\', "\\\\").replace('"', "\\\"")
+}
+
 pub fn get_habits(config: &Config) -> Result<Vec<Habit>> {
     let mut habits = Vec::new();
 
@@ -66,8 +71,8 @@ pub async fn create_habit<E: EmacsClientTrait>(
   (goto-char (point-max))
   (insert "\n{}\n")
   (save-buffer))"#,
-        file_path,
-        content.replace('\\', "\\\\").replace('"', "\\\"")
+        elisp_str(file_path),
+        elisp_str(&content)
     );
 
     emacs.eval(&elisp).await?;
@@ -86,8 +91,8 @@ pub async fn delete_habit<E: EmacsClientTrait>(emacs: &E, habit: &Habit) -> Resu
     (org-back-to-heading t)
     (org-cut-subtree))
   (save-buffer))"#,
-        file_path,
-        habit.title.replace('\\', "\\\\").replace('"', "\\\"")
+        elisp_str(file_path),
+        elisp_str(&habit.title)
     );
 
     emacs.eval(&elisp).await?;
@@ -106,8 +111,8 @@ pub async fn mark_habit_done<E: EmacsClientTrait>(emacs: &E, habit: &Habit) -> R
   (when (re-search-forward (concat "^\\*+ TODO " (regexp-quote "{}")) nil t)
     (org-todo 'done))
   (save-buffer))"#,
-        file_path,
-        habit.title.replace('\\', "\\\\").replace('"', "\\\"")
+        elisp_str(file_path),
+        elisp_str(&habit.title)
     );
 
     emacs.eval(&elisp).await?;

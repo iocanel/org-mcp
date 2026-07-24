@@ -207,7 +207,7 @@ fn find_habit(config: &Config, identifier: &str) -> Result<org_cli::models::Habi
     habits_list
         .into_iter()
         .find(|h| {
-            h.id.as_ref().map_or(false, |id| id == identifier)
+            h.id.as_deref() == Some(identifier)
                 || h.title.eq_ignore_ascii_case(identifier)
         })
         .ok_or_else(|| anyhow::anyhow!("Habit not found: {}", identifier))
