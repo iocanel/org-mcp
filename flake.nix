@@ -1,5 +1,5 @@
 {
-  description = "org-mcp - Rust MCP server for org-agenda integration";
+  description = "org-cli - Rust CLI and MCP server for org-agenda integration";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -20,7 +20,7 @@
       in
       {
         packages.default = pkgs.rustPlatform.buildRustPackage {
-          pname = "org-mcp";
+          pname = "org-cli";
           version = "0.1.0";
           src = ./.;
           cargoLock.lockFile = ./Cargo.lock;
@@ -28,10 +28,10 @@
           buildInputs = with pkgs; [ openssl ];
 
           meta = with pkgs.lib; {
-            description = "Rust MCP server for org-agenda integration";
-            homepage = "https://github.com/iocanel/org-mcp";
+            description = "Rust CLI and MCP server for org-agenda integration";
+            homepage = "https://github.com/iocanel/org-cli";
             license = licenses.mit;
-            mainProgram = "org-mcp";
+            mainProgram = "org-cli";
           };
         };
 
