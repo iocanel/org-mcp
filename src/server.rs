@@ -769,7 +769,7 @@ impl ServerHandler for OrgMcpServer {
                 .enable_tools()
                 .build(),
             server_info: Implementation {
-                name: "org-mcp".to_string(),
+                name: "org-cli".to_string(),
                 version: env!("CARGO_PKG_VERSION").to_string(),
             },
             instructions: Some("MCP server for org-agenda integration. Query tasks, habits, and events from your org files.".to_string()),
@@ -795,7 +795,7 @@ mod tests {
         let server = OrgMcpServer::with_config(config);
         let info = server.get_info();
 
-        assert_eq!(info.server_info.name, "org-mcp");
+        assert_eq!(info.server_info.name, "org-cli");
         assert!(!info.server_info.version.is_empty());
     }
 
