@@ -62,8 +62,11 @@ pub async fn create_habit<E: EmacsClientTrait>(
     };
 
     // A habit is a TODO with a repeating SCHEDULED timestamp and :STYLE: habit.
+    // Give it an :ID: (like org-roam nodes and the existing habits) so it can be
+    // referenced/backlinked and found by id, not just title.
+    let id = uuid::Uuid::new_v4().to_string();
     let content = format!(
-        "{headline}\nSCHEDULED: <{scheduled_ts}>\n:PROPERTIES:\n:STYLE:    habit\n:END:"
+        "{headline}\nSCHEDULED: <{scheduled_ts}>\n:PROPERTIES:\n:ID:       {id}\n:STYLE:    habit\n:END:"
     );
 
     let elisp = format!(

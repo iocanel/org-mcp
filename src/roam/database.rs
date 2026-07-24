@@ -305,12 +305,14 @@ impl OrgRoamDatabase {
             |row| row.get(0),
         )?;
 
-        // scheduled looks like "2025-04-17T00:00:00+0300" (leading quote); take
-        // the date portion and compare as a string (ISO dates sort lexically).
+        // scheduled looks like "2025-04-17T00:00:00+0300" (org-roam wraps it in
+        // quotes). Strip any surrounding quotes, then take the leading date
+        // portion and compare as a string (ISO dates sort lexically). trim()
+        // makes this robust whether or not the value is quoted.
         let due_scheduled: i64 = self.conn.query_row(
             "SELECT COUNT(*) FROM nodes n JOIN tags t ON t.node_id = n.id \
              WHERE (t.tag = 'drill' OR t.tag = '\"drill\"') \
-             AND n.scheduled IS NOT NULL AND substr(n.scheduled, 2, 10) <= ?1",
+             AND n.scheduled IS NOT NULL AND substr(trim(n.scheduled, '\"'), 1, 10) <= ?1",
             [today],
             |row| row.get(0),
         )?;
@@ -664,10 +666,15 @@ mod tests {
                 deadline TEXT, title TEXT, properties TEXT, olp TEXT);
             CREATE TABLE tags (node_id TEXT, tag TEXT);
 
-            -- due drill card (scheduled in the past)
+            -- due drill card, quoted scheduled (the org-roam format)
             INSERT INTO nodes VALUES ('"d1"','"f.org"',1,1,NULL,NULL,
                 '"2020-01-01T00:00:00+0300"',NULL,'"Due card"',NULL,NULL);
             INSERT INTO tags VALUES ('"d1"', '"drill"');
+
+            -- due drill card, UNQUOTED scheduled (trim() must handle both)
+            INSERT INTO nodes VALUES ('"d1b"','"f.org"',1,5,NULL,NULL,
+                '2020-02-02T00:00:00+0300',NULL,'"Due card 2"',NULL,NULL);
+            INSERT INTO tags VALUES ('"d1b"', '"drill"');
 
             -- new drill card (never scheduled)
             INSERT INTO nodes VALUES ('"d2"','"f.org"',1,2,NULL,NULL,
@@ -696,8 +703,11 @@ mod tests {
         let db = OrgRoamDatabase::open(&db_path).unwrap();
 
         let stats = db.drill_stats("2026-07-24").unwrap();
-        assert_eq!(stats.total, 3, "three :drill: cards");
-        assert_eq!(stats.due_scheduled, 1, "only the past-scheduled card is due");
+        assert_eq!(stats.total, 4, "four :drill: cards");
+        assert_eq!(
+            stats.due_scheduled, 2,
+            "both past-scheduled cards are due (quoted + unquoted)"
+        );
         assert_eq!(stats.new_unscheduled, 1, "only the never-scheduled card is new");
     }
 }

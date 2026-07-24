@@ -66,10 +66,17 @@ impl EmacsClient {
         Ok(stdout)
     }
 
-    /// Open a new Emacs client frame and evaluate `elisp` in it, WITHOUT waiting
-    /// for it to finish. Use this for interactive commands (e.g. org-drill) that
-    /// run a review loop and would otherwise block the daemon. Returns once the
-    /// frame has been requested.
+    /// Open a new Emacs client frame and evaluate `elisp` in it without waiting
+    /// for the eval to finish. Use this for interactive commands (e.g. org-drill)
+    /// that run a review loop and would otherwise block the caller (or the daemon
+    /// if run via --eval). The child `emacsclient` process is detached; we return
+    /// as soon as it is spawned.
+    ///
+    /// Caveat: with `-a ""`, if no Emacs daemon is running this will START one
+    /// first, so the call is only near-instant when a daemon already exists
+    /// (the normal case here). The spawned child is intentionally not awaited;
+    /// once it exits it is reaped by the OS (init) after this short-lived process
+    /// returns.
     pub async fn spawn_frame(&self, elisp: &str) -> Result<()> {
         let mut cmd = Command::new("emacsclient");
         if let Some(ref socket) = self.socket_name {
@@ -81,8 +88,9 @@ impl EmacsClient {
         cmd.stdout(Stdio::null());
         cmd.stderr(Stdio::null());
 
-        cmd.spawn()
-            .context("Failed to spawn emacsclient frame")?;
+        // Detach: drop the Child handle so we don't wait on the interactive session.
+        let child = cmd.spawn().context("Failed to spawn emacsclient frame")?;
+        drop(child);
         Ok(())
     }
 }

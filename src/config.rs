@@ -71,16 +71,24 @@ impl Default for Config {
 
 impl Config {
     pub fn load() -> Result<Self> {
+        // Prefer the current path (~/.config/org-cli/); fall back to the legacy
+        // ~/.config/org-mcp/ path so pre-rename configs keep working.
         let config_path = Self::config_path()?;
-
-        if config_path.exists() {
-            let content = std::fs::read_to_string(&config_path)
-                .with_context(|| format!("Failed to read config: {}", config_path.display()))?;
-            let config: Config = toml::from_str(&content)
-                .with_context(|| format!("Failed to parse config: {}", config_path.display()))?;
-            Ok(config)
+        let path = if config_path.exists() {
+            Some(config_path)
         } else {
-            Ok(Self::default())
+            Self::legacy_config_path().filter(|p| p.exists())
+        };
+
+        match path {
+            Some(p) => {
+                let content = std::fs::read_to_string(&p)
+                    .with_context(|| format!("Failed to read config: {}", p.display()))?;
+                let config: Config = toml::from_str(&content)
+                    .with_context(|| format!("Failed to parse config: {}", p.display()))?;
+                Ok(config)
+            }
+            None => Ok(Self::default()),
         }
     }
 
@@ -98,12 +106,14 @@ impl Config {
     }
 
     fn config_path() -> Result<PathBuf> {
-        let config_dir = directories::ProjectDirs::from("com", "iocanel", "org-mcp")
-            .context("Could not determine config directory")?
-            .config_dir()
-            .to_path_buf();
+        let config_dir = dirs::config_dir().context("Could not determine config directory")?;
+        Ok(config_dir.join("org-cli").join("config.toml"))
+    }
 
-        Ok(config_dir.join("config.toml"))
+    /// Pre-rename config location (~/.config/org-mcp/config.toml). Read-only
+    /// fallback so existing installs keep working; new writes go to config_path.
+    fn legacy_config_path() -> Option<PathBuf> {
+        dirs::config_dir().map(|d| d.join("org-mcp").join("config.toml"))
     }
 
     pub fn expand_path(path: &str) -> PathBuf {
