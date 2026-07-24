@@ -1,7 +1,20 @@
 use crate::roam::models::{DatabaseStats, OrgRoamFile, OrgRoamLink, OrgRoamNode};
 use anyhow::{Context, Result};
+use rusqlite::types::ValueRef;
 use rusqlite::{Connection, OpenFlags};
 use std::path::{Path, PathBuf};
+
+/// Read a column as a String regardless of whether SQLite stored it as text,
+/// integer, real, or null. org-roam stores atime/mtime as Lisp time lists
+/// (text) but some databases use integer epochs.
+fn value_to_string(row: &rusqlite::Row, idx: usize) -> rusqlite::Result<Option<String>> {
+    Ok(match row.get_ref(idx)? {
+        ValueRef::Integer(i) => Some(i.to_string()),
+        ValueRef::Real(f) => Some(f.to_string()),
+        ValueRef::Text(t) => Some(String::from_utf8_lossy(t).into_owned()),
+        ValueRef::Null | ValueRef::Blob(_) => None,
+    })
+}
 
 pub struct OrgRoamDatabase {
     conn: Connection,
@@ -262,14 +275,17 @@ impl OrgRoamDatabase {
             .conn
             .prepare("SELECT file, title, hash, atime, mtime FROM files ORDER BY file")?;
 
+        // org-roam stores atime/mtime as Emacs Lisp time lists rendered as text
+        // (e.g. "(26216 43832 323500 865000)"), but some DBs/fixtures use integer
+        // epochs. Read them value-agnostically so either form works.
         let files = stmt
             .query_map([], |row| {
                 Ok(OrgRoamFile {
                     file: row.get(0)?,
                     title: row.get(1)?,
                     hash: row.get(2)?,
-                    atime: row.get(3)?,
-                    mtime: row.get(4)?,
+                    atime: value_to_string(row, 3)?,
+                    mtime: value_to_string(row, 4)?,
                 })
             })?
             .collect::<Result<Vec<_>, _>>()?;
