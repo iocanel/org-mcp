@@ -4,7 +4,7 @@ use chrono::Local;
 use org_cli::config::Config;
 use org_cli::emacs::EmacsClient;
 use org_cli::server::OrgMcpServer;
-use org_cli::tools::{agenda, habits};
+use org_cli::tools::{agenda, drill, habits};
 use rmcp::{ServiceExt, transport::stdio};
 use tracing_subscriber::EnvFilter;
 
@@ -33,6 +33,19 @@ enum Commands {
         #[command(subcommand)]
         subcommand: HabitsCommands,
     },
+    /// org-drill spaced-repetition
+    Drill {
+        #[command(subcommand)]
+        subcommand: DrillCommands,
+    },
+}
+
+#[derive(Subcommand)]
+enum DrillCommands {
+    /// Show drill card counts (total, due, new)
+    Status,
+    /// Launch an interactive org-drill session in a new Emacs frame
+    Start,
 }
 
 #[derive(Subcommand)]
@@ -171,6 +184,17 @@ async fn run_cli_command(cmd: Commands) -> Result<()> {
                 let target = find_habit(&config, &habit)?;
                 habits::delete_habit(&emacs, &target).await?;
                 println!("Deleted '{}'", target.title);
+            }
+        },
+        Commands::Drill { subcommand } => match subcommand {
+            DrillCommands::Status => {
+                let result = drill::drill_status()?;
+                println!("{}", serde_json::to_string_pretty(&result)?);
+            }
+            DrillCommands::Start => {
+                let emacs = EmacsClient::new();
+                drill::start_drill(&emacs).await?;
+                println!("Launched org-drill session in a new Emacs frame.");
             }
         },
     }

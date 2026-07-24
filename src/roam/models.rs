@@ -40,6 +40,17 @@ pub struct OrgRoamFile {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DrillStats {
+    /// All :drill: cards in the roam database.
+    pub total: i64,
+    /// Cards with a SCHEDULED date on or before today (clearly due).
+    pub due_scheduled: i64,
+    /// New cards that have never been scheduled (org-drill introduces these,
+    /// capped per session).
+    pub new_unscheduled: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DatabaseStats {
     pub nodes: i64,
     pub files: i64,

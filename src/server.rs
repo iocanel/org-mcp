@@ -5,7 +5,7 @@ use crate::config::Config;
 use crate::emacs::{EmacsClient, EmacsClientTrait};
 use crate::models::InboxSection;
 use crate::roam::OrgRoamDatabase;
-use crate::tools::{agenda, habits, inbox, tasks};
+use crate::tools::{agenda, drill, habits, inbox, tasks};
 use anyhow::Result;
 use rmcp::{
     ErrorData as McpError, RoleServer, ServerHandler,
@@ -810,6 +810,28 @@ impl OrgMcpServer {
                 "message": format!("Added link from '{}' to '{}'", source_node.title.unwrap_or_default(), target_title)
             }))
             .unwrap(),
+        )]))
+    }
+
+    #[tool(
+        description = "Show org-drill card counts (total, due-scheduled, new-unscheduled). This is the underlying signal, not the exact set a session presents."
+    )]
+    async fn drill_status(&self) -> Result<CallToolResult, McpError> {
+        let stats = drill::drill_status().map_err(|e| McpError::internal_error(e.to_string(), None))?;
+        let json = serde_json::to_string_pretty(&stats)
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+        Ok(CallToolResult::success(vec![Content::text(json)]))
+    }
+
+    #[tool(
+        description = "Launch an interactive org-drill session in a new Emacs frame (non-blocking; the user drills in Emacs)"
+    )]
+    async fn drill_start(&self) -> Result<CallToolResult, McpError> {
+        drill::start_drill(&self.emacs)
+            .await
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+        Ok(CallToolResult::success(vec![Content::text(
+            "Launched org-drill session in a new Emacs frame.".to_string(),
         )]))
     }
 

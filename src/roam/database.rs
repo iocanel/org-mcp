@@ -1,4 +1,4 @@
-use crate::roam::models::{DatabaseStats, OrgRoamFile, OrgRoamLink, OrgRoamNode};
+use crate::roam::models::{DatabaseStats, DrillStats, OrgRoamFile, OrgRoamLink, OrgRoamNode};
 use anyhow::{Context, Result};
 use rusqlite::types::ValueRef;
 use rusqlite::{Connection, OpenFlags};
@@ -291,6 +291,42 @@ impl OrgRoamDatabase {
             .collect::<Result<Vec<_>, _>>()?;
 
         Ok(files)
+    }
+
+    /// Raw org-drill card counts derivable from the DB. NOTE: this is not the
+    /// exact set org-drill will present in a session (that applies new-card caps
+    /// and the spaced-repetition algorithm at drill time); it is the reliable
+    /// underlying signal. `today` is an ISO date (YYYY-MM-DD).
+    pub fn drill_stats(&self, today: &str) -> Result<DrillStats> {
+        // org-roam stores tags quoted, e.g. "drill"; match both forms.
+        let total: i64 = self.conn.query_row(
+            "SELECT COUNT(*) FROM tags WHERE tag = 'drill' OR tag = '\"drill\"'",
+            [],
+            |row| row.get(0),
+        )?;
+
+        // scheduled looks like "2025-04-17T00:00:00+0300" (leading quote); take
+        // the date portion and compare as a string (ISO dates sort lexically).
+        let due_scheduled: i64 = self.conn.query_row(
+            "SELECT COUNT(*) FROM nodes n JOIN tags t ON t.node_id = n.id \
+             WHERE (t.tag = 'drill' OR t.tag = '\"drill\"') \
+             AND n.scheduled IS NOT NULL AND substr(n.scheduled, 2, 10) <= ?1",
+            [today],
+            |row| row.get(0),
+        )?;
+
+        let new_unscheduled: i64 = self.conn.query_row(
+            "SELECT COUNT(*) FROM nodes n JOIN tags t ON t.node_id = n.id \
+             WHERE (t.tag = 'drill' OR t.tag = '\"drill\"') AND n.scheduled IS NULL",
+            [],
+            |row| row.get(0),
+        )?;
+
+        Ok(DrillStats {
+            total,
+            due_scheduled,
+            new_unscheduled,
+        })
     }
 
     pub fn get_database_stats(&self) -> Result<DatabaseStats> {
@@ -590,5 +626,53 @@ mod tests {
         assert_eq!(stats.links, 1);
         assert_eq!(stats.unique_tags, 2);
         assert_eq!(stats.aliases, 1);
+    }
+
+    fn create_drill_test_database(temp_dir: &TempDir) -> PathBuf {
+        let db_path = temp_dir.path().join("org-roam.db");
+        let conn = Connection::open(&db_path).unwrap();
+        conn.execute_batch(
+            r#"
+            CREATE TABLE files (file UNIQUE PRIMARY KEY, title, hash, atime, mtime);
+            CREATE TABLE nodes (id TEXT PRIMARY KEY, file TEXT, level INTEGER,
+                pos INTEGER, todo TEXT, priority TEXT, scheduled TEXT,
+                deadline TEXT, title TEXT, properties TEXT, olp TEXT);
+            CREATE TABLE tags (node_id TEXT, tag TEXT);
+
+            -- due drill card (scheduled in the past)
+            INSERT INTO nodes VALUES ('"d1"','"f.org"',1,1,NULL,NULL,
+                '"2020-01-01T00:00:00+0300"',NULL,'"Due card"',NULL,NULL);
+            INSERT INTO tags VALUES ('"d1"', '"drill"');
+
+            -- new drill card (never scheduled)
+            INSERT INTO nodes VALUES ('"d2"','"f.org"',1,2,NULL,NULL,
+                NULL,NULL,'"New card"',NULL,NULL);
+            INSERT INTO tags VALUES ('"d2"', '"drill"');
+
+            -- future drill card (scheduled after today, NOT due)
+            INSERT INTO nodes VALUES ('"d3"','"f.org"',1,3,NULL,NULL,
+                '"2999-01-01T00:00:00+0300"',NULL,'"Future card"',NULL,NULL);
+            INSERT INTO tags VALUES ('"d3"', '"drill"');
+
+            -- non-drill node
+            INSERT INTO nodes VALUES ('"n1"','"f.org"',1,4,NULL,NULL,
+                NULL,NULL,'"Plain"',NULL,NULL);
+            INSERT INTO tags VALUES ('"n1"', '"other"');
+            "#,
+        )
+        .unwrap();
+        db_path
+    }
+
+    #[test]
+    fn test_drill_stats() {
+        let temp_dir = TempDir::new().unwrap();
+        let db_path = create_drill_test_database(&temp_dir);
+        let db = OrgRoamDatabase::open(&db_path).unwrap();
+
+        let stats = db.drill_stats("2026-07-24").unwrap();
+        assert_eq!(stats.total, 3, "three :drill: cards");
+        assert_eq!(stats.due_scheduled, 1, "only the past-scheduled card is due");
+        assert_eq!(stats.new_unscheduled, 1, "only the never-scheduled card is new");
     }
 }

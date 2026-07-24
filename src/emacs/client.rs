@@ -65,6 +65,26 @@ impl EmacsClient {
         let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
         Ok(stdout)
     }
+
+    /// Open a new Emacs client frame and evaluate `elisp` in it, WITHOUT waiting
+    /// for it to finish. Use this for interactive commands (e.g. org-drill) that
+    /// run a review loop and would otherwise block the daemon. Returns once the
+    /// frame has been requested.
+    pub async fn spawn_frame(&self, elisp: &str) -> Result<()> {
+        let mut cmd = Command::new("emacsclient");
+        if let Some(ref socket) = self.socket_name {
+            cmd.arg("--socket-name").arg(socket);
+        }
+        // -c creates a new frame; -a "" starts a daemon if none is running.
+        cmd.arg("-c").arg("-a").arg("").arg("--eval").arg(elisp);
+        cmd.stdin(Stdio::null());
+        cmd.stdout(Stdio::null());
+        cmd.stderr(Stdio::null());
+
+        cmd.spawn()
+            .context("Failed to spawn emacsclient frame")?;
+        Ok(())
+    }
 }
 
 impl Default for EmacsClient {
