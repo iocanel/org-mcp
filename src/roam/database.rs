@@ -612,6 +612,31 @@ mod tests {
         let files = db.get_all_files().unwrap();
         assert_eq!(files.len(), 1);
         assert_eq!(files[0].title, Some("Test File".to_string()));
+        // fixture stores atime as INTEGER -> value_to_string Integer branch
+        assert_eq!(files[0].atime.as_deref(), Some("1609459200"));
+    }
+
+    #[test]
+    fn test_get_all_files_text_atime() {
+        // The REAL org-roam format stores atime/mtime as Lisp time lists (text),
+        // e.g. "(26216 43832 323500 865000)". This is the case the value_to_string
+        // helper exists for; the fixture above only covers integers.
+        let temp_dir = TempDir::new().unwrap();
+        let db_path = temp_dir.path().join("org-roam.db");
+        let conn = Connection::open(&db_path).unwrap();
+        conn.execute_batch(
+            r#"
+            CREATE TABLE files (file UNIQUE PRIMARY KEY, title, hash, atime, mtime);
+            INSERT INTO files VALUES ('/f.org', '"F"', 'h',
+                '(26216 43832 323500 865000)', '(26216 43832 0 0)');
+            "#,
+        )
+        .unwrap();
+        let db = OrgRoamDatabase::open(&db_path).unwrap();
+        let files = db.get_all_files().unwrap();
+        assert_eq!(files.len(), 1);
+        assert_eq!(files[0].atime.as_deref(), Some("(26216 43832 323500 865000)"));
+        assert_eq!(files[0].title.as_deref(), Some("\"F\""));
     }
 
     #[test]

@@ -1,6 +1,8 @@
-# org-mcp
+# org-cli
 
-An MCP (Model Context Protocol) server for org-mode and org-roam integration.
+A CLI and MCP (Model Context Protocol) server for org-mode and org-roam integration.
+
+Run as an MCP server with `org-cli --mcp`, or use the subcommands directly (`org-cli agenda today`, `org-cli habits ...`, `org-cli drill ...`).
 
 ## Features
 
@@ -15,7 +17,13 @@ An MCP (Model Context Protocol) server for org-mode and org-roam integration.
 ### Habit Tracking
 - `get_habits` - Get all habits with their current status
 - `get_habits_due_today` - Get habits due today
-- `mark_habit_done` - Mark a habit as done for today
+- `create_habit` - Create a new recurring habit (TODO with a repeating SCHEDULED and :STYLE: habit)
+- `mark_habit_done` - Mark a habit as done for today (org-habit reschedules it)
+- `delete_habit` - Delete a habit by ID or title
+
+### org-drill
+- `drill_status` - Show drill card counts (total, due-scheduled, new-unscheduled)
+- `drill_start` - Launch an interactive org-drill session in a new Emacs frame (non-blocking)
 
 ### Task Management
 - `create_task` - Create a new task in a specified file
@@ -47,9 +55,34 @@ nix build
 cargo build --release
 ```
 
+## Install (dev)
+
+A justfile is provided:
+
+```bash
+just build       # release build
+just install     # build + install to ~/bin/org-cli (on PATH)
+just test        # run tests
+just lint        # clippy
+```
+
+## CLI usage
+
+```bash
+org-cli agenda today
+org-cli agenda upcoming --days 7
+org-cli habits all
+org-cli habits create "Weekly review" --repeater .+1w --file ~/Documents/org/habits.org --tags review
+org-cli habits mark "Weekly review"
+org-cli habits delete "Weekly review"
+org-cli drill status
+org-cli drill start
+org-cli --mcp          # run as an MCP server (stdio)
+```
+
 ## Configuration
 
-Configuration file is located at `~/.config/org-mcp/config.toml`:
+Configuration file is located at `~/.config/org-mcp/config.toml` (the config directory name is still `org-mcp` for back-compat with existing installs):
 
 ```toml
 [agenda]
@@ -84,8 +117,9 @@ Add to your Claude Desktop configuration:
 ```json
 {
   "mcpServers": {
-    "org-mcp": {
-      "command": "/path/to/org-mcp"
+    "org-cli": {
+      "command": "org-cli",
+      "args": ["--mcp"]
     }
   }
 }
@@ -98,8 +132,9 @@ Add to your Claude Code MCP settings:
 ```json
 {
   "mcpServers": {
-    "org-mcp": {
-      "command": "/path/to/org-mcp"
+    "org-cli": {
+      "command": "org-cli",
+      "args": ["--mcp"]
     }
   }
 }
@@ -113,4 +148,4 @@ Add to your Claude Code MCP settings:
 
 ## License
 
-Apache License 2.0
+MIT
