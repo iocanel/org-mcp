@@ -33,8 +33,10 @@ pub struct OrgRoamFile {
     pub file: String,
     pub title: Option<String>,
     pub hash: String,
-    pub atime: i64,
-    pub mtime: i64,
+    // org-roam stores atime/mtime as Emacs Lisp time lists rendered as text,
+    // e.g. "(26216 43832 323500 865000)" - read them as strings, not integers.
+    pub atime: Option<String>,
+    pub mtime: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
