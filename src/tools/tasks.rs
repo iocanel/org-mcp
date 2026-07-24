@@ -55,7 +55,7 @@ pub async fn complete_task<E: EmacsClientTrait>(
     let elisp = format!(
         r#"(with-current-buffer (find-file-noselect "{}")
   (goto-char (point-min))
-  (when (re-search-forward "^\\*+ TODO {}" nil t)
+  (when (re-search-forward (concat "^\\*+ TODO " (regexp-quote "{}")) nil t)
     (org-todo 'done))
   (save-buffer))"#,
         task.file_path,
@@ -74,7 +74,7 @@ pub async fn update_task_scheduled<E: EmacsClientTrait>(
     let elisp = format!(
         r#"(with-current-buffer (find-file-noselect "{}")
   (goto-char (point-min))
-  (when (re-search-forward "^\\*+ \\(TODO\\|NEXT\\|WAITING\\) {}" nil t)
+  (when (re-search-forward (concat "^\\*+ \\(TODO\\|NEXT\\|WAITING\\) " (regexp-quote "{}")) nil t)
     (org-schedule nil "<{}>"))
   (save-buffer))"#,
         task.file_path,
@@ -94,7 +94,7 @@ pub async fn update_task_deadline<E: EmacsClientTrait>(
     let elisp = format!(
         r#"(with-current-buffer (find-file-noselect "{}")
   (goto-char (point-min))
-  (when (re-search-forward "^\\*+ \\(TODO\\|NEXT\\|WAITING\\) {}" nil t)
+  (when (re-search-forward (concat "^\\*+ \\(TODO\\|NEXT\\|WAITING\\) " (regexp-quote "{}")) nil t)
     (org-deadline nil "<{}>"))
   (save-buffer))"#,
         task.file_path,
@@ -121,7 +121,7 @@ pub async fn refile_task<E: EmacsClientTrait>(
     let elisp = format!(
         r#"(with-current-buffer (find-file-noselect "{}")
   (goto-char (point-min))
-  (when (re-search-forward "^\\*+ \\(TODO\\|DONE\\|NEXT\\|WAITING\\|CANCELLED\\) {}" nil t)
+  (when (re-search-forward (concat "^\\*+ \\(TODO\\|DONE\\|NEXT\\|WAITING\\|CANCELLED\\) " (regexp-quote "{}")) nil t)
     (org-refile nil nil {}))
   (save-buffer)
   (with-current-buffer (find-file-noselect "{}")

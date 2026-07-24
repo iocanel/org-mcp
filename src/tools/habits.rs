@@ -77,11 +77,12 @@ pub async fn create_habit<E: EmacsClientTrait>(
 pub async fn delete_habit<E: EmacsClientTrait>(emacs: &E, habit: &Habit) -> Result<()> {
     let file_path = &habit.file_path;
 
-    // Delete the whole subtree of the matching habit headline.
+    // Delete the whole subtree of the matching habit headline. regexp-quote the
+    // title so special characters (+, *, ?, ., [ ...) are matched literally.
     let elisp = format!(
         r#"(with-current-buffer (find-file-noselect "{}")
   (goto-char (point-min))
-  (when (re-search-forward "^\\*+ TODO {}" nil t)
+  (when (re-search-forward (concat "^\\*+ TODO " (regexp-quote "{}")) nil t)
     (org-back-to-heading t)
     (org-cut-subtree))
   (save-buffer))"#,
@@ -96,12 +97,13 @@ pub async fn delete_habit<E: EmacsClientTrait>(emacs: &E, habit: &Habit) -> Resu
 pub async fn mark_habit_done<E: EmacsClientTrait>(emacs: &E, habit: &Habit) -> Result<()> {
     let file_path = &habit.file_path;
 
-    // Use emacsclient to mark the habit as done
+    // Use emacsclient to mark the habit as done. regexp-quote the title so
+    // special characters are matched literally.
     // org-habit will automatically reschedule it based on the repeater
     let elisp = format!(
         r#"(with-current-buffer (find-file-noselect "{}")
   (goto-char (point-min))
-  (when (re-search-forward "^\\*+ TODO {}" nil t)
+  (when (re-search-forward (concat "^\\*+ TODO " (regexp-quote "{}")) nil t)
     (org-todo 'done))
   (save-buffer))"#,
         file_path,
@@ -291,6 +293,33 @@ SCHEDULED: <2026-03-05 Thu .+1d/3d>
         )
         .await;
         assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_delete_habit_with_regex_special_title() {
+        // Titles with regex-special chars (+, *, ?, .) must be regexp-quoted in
+        // the elisp so the search matches literally.
+        let habit = Habit {
+            id: Some("habit-x".to_string()),
+            title: "Review blog + talk idea buckets".to_string(),
+            scheduled: Some(chrono::NaiveDate::from_ymd_opt(2026, 7, 24).unwrap()),
+            repeater: Some(".+1w".to_string()),
+            file_path: "/path/to/habits.org".to_string(),
+            line_number: 10,
+        };
+
+        let mut mock_emacs = MockEmacsClientTrait::new();
+        mock_emacs
+            .expect_eval()
+            .withf(|elisp: &str| {
+                elisp.contains("regexp-quote")
+                    && elisp.contains("Review blog + talk idea buckets")
+                    && elisp.contains("org-cut-subtree")
+            })
+            .times(1)
+            .returning(|_| Box::pin(async { Ok("nil".to_string()) }));
+
+        assert!(delete_habit(&mock_emacs, &habit).await.is_ok());
     }
 
     #[tokio::test]
